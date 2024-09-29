@@ -1,10 +1,11 @@
 #include "raylib.h"
+#include "raymath.h"
 #include <stdio.h>
 #include <math.h>
 
 #define WINDOW_WIDTH 1600
 #define WINDOW_HEIGHT 900
-#define BALL_SIZE 20
+#define BALL_SIZE 10
 #define FPS 60
 
 #define MAX(a,b) ((a) > (b) ? a : b)
@@ -13,6 +14,8 @@
 typedef struct Ball {
     Rectangle rect;
     Vector2 velocity;
+    float speed;
+    float lastScoreHit;
 } Ball;
 
 typedef enum GameState {
@@ -21,8 +24,9 @@ typedef enum GameState {
 } GameState;
 
 void ResetBall(Ball *ball) {
-    ball->rect = (Rectangle){WINDOW_WIDTH / 2 - BALL_SIZE - 400, WINDOW_HEIGHT / 2 - BALL_SIZE, 2 * BALL_SIZE, 2 * BALL_SIZE};
-    ball->velocity = (Vector2){-100, 10};
+    ball->rect = (Rectangle){WINDOW_WIDTH / 2 - BALL_SIZE, WINDOW_HEIGHT / 2 - BALL_SIZE, 2 * BALL_SIZE, 2 * BALL_SIZE};
+    ball->velocity = Vector2Normalize((Vector2){1, 1});
+    ball->speed = 500;
 }
 
 float playerSpeed = 300;
@@ -34,6 +38,7 @@ int main() {
     ResetBall(&ball);
 
     GameState gameState = PLAYING;
+    int score = 0;
 
     InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Pong");
 
@@ -50,11 +55,13 @@ int main() {
             playerPaddle.y = MAX(0, playerPaddle.y - deltaTime * playerSpeed);
         }
         if (IsKeyPressed(KEY_R)) {
+            score = 0;
             ResetBall(&ball);
         }
 
-        ball.rect.x = ball.rect.x + deltaTime * ball.velocity.x;
-        ball.rect.y = ball.rect.y + deltaTime * ball.velocity.y;
+        ball.rect.x = ball.rect.x + deltaTime * ball.velocity.x * ball.speed;
+        ball.rect.y = ball.rect.y + deltaTime * ball.velocity.y * ball.speed;
+        ball.lastScoreHit = MAX(0, ball.lastScoreHit - deltaTime);
 
         if (ball.rect.y <= 0) {
             ball.velocity.y = -ball.velocity.y;
@@ -71,6 +78,11 @@ int main() {
 
         if (CheckCollisionRecs(ball.rect, playerPaddleMain) && ball.rect.x > playerPaddleMain.x) {
             ball.velocity.x = fabs(ball.velocity.x);
+            if (ball.lastScoreHit == 0) {
+                ball.speed = ball.speed * 1.1f;
+                ball.lastScoreHit = 0.2f;
+                score++;
+            }
         } else if (CheckCollisionRecs(ball.rect, playerPaddleTop)) {
             ball.velocity.y = -fabs(ball.velocity.y);
         } else if (CheckCollisionRecs(ball.rect, playerPaddleBottom)) {
@@ -78,6 +90,7 @@ int main() {
         }
 
         if (ball.rect.x < 0) {
+            score = 0;
             ResetBall(&ball);
         }
 
@@ -91,7 +104,9 @@ int main() {
             if (gameState == GAME_OVER) {
                 DrawText("Game Over", 200, 200, 20, RED);
             }
-
+            
+            char *scoreText = TextFormat("%d", score);
+            DrawText(scoreText, WINDOW_WIDTH/2 - MeasureText(scoreText, 40), 50, 40, WHITE);
             DrawFPS(0, 0);
 
         EndDrawing();
